@@ -1,0 +1,2 @@
+LOC-TSPAN                      CONTAINER  REFL            SHADE      TMEAN  TMAX   TMIN   CMEAN  CMAX   CMIN   TAMEAN EVAP  
+MERRA_IMERG-NuwaraEliya-2001_2020_12-clim          Bucket     Gray            HalfShade  14.07  21.63  8.68   14.43  20.20  10.08  14.67  0.1546

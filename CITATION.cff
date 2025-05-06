@@ -17,7 +17,7 @@ authors:
   given-names: "Anita"
   orcid: "https://orcid.org/0000-0002-7204-8164"
 title: "mosquitoSimCity"
-version: 1.0.0
+version: 1.1.0
 doi: 10.5281/zenodo.14736671
-date-released: 2025-01-24
+date-released: 2025-05-05
 url: "https://github.com/chanudn/mosquitoSimCity"

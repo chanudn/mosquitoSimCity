@@ -1,6 +1,9 @@
 # scripts_analysis.py
 #
 # Assorted blocks of code for analyzing data from WHATCH'EM and the vector survival simulations.
+#
+# Revision history
+#    2025-04-17, CNY: updated scripts to account for Focks vs Eisen survival curves
 
 
 
@@ -26,7 +29,7 @@ from fns_helper import (strConvert_paren2hyphen, strConvert_parenUnitsRemove, ge
 
 
 # calculate and save tercile crosstabs of monthly values of variables against dengue incidence
-# (each resulting df has the crosstab values for one variable for a given lag+outbreakYr scenario)
+# (each resulting df has the crosstab values for ONE variable for a given lag+outbreakYr scenario)
 if False:
 
     # parameters related to modeling pipeline
@@ -39,6 +42,7 @@ if False:
     initEggs   = 1000
     initLarvae = 1000
     initPupae  = 1000
+    survCurve  = 'Eisen' # ['Focks', 'Eisen']
     var_colNames = ['TA_min (C)', 'TA (C)' ,'TA_max (C)', 'PRCP (mm)', 'TW_min_nanFill (C)', 'TW_nanFill (C)', 'TW_max_nanFill (C)', 'WH (mm)',
                    'dev_E', 'surv_E', 'dev_L', 'surv_L', 'dev_P', 'surv_P', 'pop_A(E)', 'pop_A(L)', 'pop_A(P)'] # subset of vars to actually plot
     var_pltNames = [strConvert_paren2hyphen(strConvert_parenUnitsRemove(x)) for x in var_colNames]
@@ -74,12 +78,17 @@ if False:
 
         # load model pipeline data at location of interest
         # also: convert from daily to monthly, subset to time of interest
-        df_vectorPop_dly = get_df_vectorPop_dly_merged(dataSrc, loc, years, months, intv, initDays, initEggs, initLarvae, initPupae)
+        df_vectorPop_dly = get_df_vectorPop_dly_merged(dataSrc, loc, years, months, intv, initDays, initEggs, initLarvae, initPupae, survCurve)
         df_vectorPop_monthly = convert_df_vectorPop_dly2mon(df_vectorPop_dly)
         df_vectorPop_monthly = df_vectorPop_monthly[startDate:endDate]
 
         # combine model pipeline data and dengue data into one df
         df_vectorPop_den_monthly = df_vectorPop_monthly.join(df_den_monthly_loc_wLags)
+
+        if survCurve == 'Eisen':
+            fileStr_survCurve = '_eisenQuadFit'
+        else: # if survCurve is 'Focks'
+            fileStr_survCurve = ''
 
         for noOutbreaks in noOutbreaks_opts:
             print(' noOutbreaks: ' + str(noOutbreaks))
@@ -104,13 +113,13 @@ if False:
                     den_colName = den_colName_base + '-lag' + str(lagTime) # this must match col name format set in create_df_withLags()
                     den_pltName = den_colName # just reusing the column name here for simplicity
                     
-                    fileName = 'crosstab_tercile_splitbyMon_' + var_pltName + '_' + den_pltName + '_' + loc + fileStr_noOutbreaks
+                    fileName = 'crosstab_tercile_splitbyMon_' + var_pltName + '_' + den_pltName + '_' + loc + fileStr_noOutbreaks + fileStr_survCurve
                     calc_tercile_crosstab_splitByMon(df_vectorPop_den_monthly_yrFiltered, var_colName, den_colName, fileName)
 
 
 
 # calculate and save tercile crosstab element values (e.g. High-High) of monthly values of variables against dengue incidence
-# (each resulting df has the crosstab element values for all the variables for a given lag+outbreakYr scenario)
+# (each resulting df has the crosstab element values for ALL the variables for a given lag+outbreakYr scenario)
 if False:
 
     # parameters related to modeling pipeline
@@ -123,6 +132,7 @@ if False:
     initEggs   = 1000
     initLarvae = 1000
     initPupae  = 1000
+    survCurve  = 'Eisen' # ['Focks', 'Eisen']
     var_colNames = ['TA_min (C)', 'TA (C)', 'TA_max (C)', 'PRCP (mm)', 'TW_min_nanFill (C)', 'TW_nanFill (C)', 'TW_max_nanFill (C)', 'WH (mm)',
                     'dev_E', 'surv_E', 'dev_L', 'surv_L', 'dev_P', 'surv_P', 'pop_A(E)', 'pop_A(L)', 'pop_A(P)'] # subset of vars to actually plot
     var_pltNames = [strConvert_paren2hyphen(strConvert_parenUnitsRemove(x)) for x in var_colNames]
@@ -163,12 +173,17 @@ if False:
 
         # load model pipeline data at location of interest
         # also: convert from daily to monthly, subset to time of interest
-        df_vectorPop_dly = get_df_vectorPop_dly_merged(dataSrc, loc, years, months, intv, initDays, initEggs, initLarvae, initPupae)
+        df_vectorPop_dly = get_df_vectorPop_dly_merged(dataSrc, loc, years, months, intv, initDays, initEggs, initLarvae, initPupae, survCurve)
         df_vectorPop_monthly = convert_df_vectorPop_dly2mon(df_vectorPop_dly)
         df_vectorPop_monthly = df_vectorPop_monthly[startDate:endDate]
 
         # combine model pipeline data and dengue data into one df
         df_vectorPop_den_monthly = df_vectorPop_monthly.join(df_den_monthly_loc_wLags)
+
+        if survCurve == 'Eisen':
+            fileStr_survCurve = '_eisenQuadFit'
+        else: # if survCurve is 'Focks'
+            fileStr_survCurve = ''
 
         for noOutbreaks in noOutbreaks_opts:
             print(' noOutbreaks: ' + str(noOutbreaks))
@@ -204,7 +219,7 @@ if False:
                         den_colName = den_colName_base + '-lag' + str(lagTime) # this must match col name format set in create_df_withLags()
                         den_pltName = den_colName # just reusing the column name here for simplicity
                         
-                        fileName = 'crosstab_tercile_splitbyMon_' + var_pltName + '_' + den_pltName + '_' + loc + fileStr_noOutbreaks
+                        fileName = 'crosstab_tercile_splitbyMon_' + var_pltName + '_' + den_pltName + '_' + loc + fileStr_noOutbreaks + fileStr_survCurve
                         filePath = DIR_WHATCHEM_OUTPUT_DATA_PROCESSED + 'crosstabs/' + fileName + '.csv'
                         filePath_norm = DIR_WHATCHEM_OUTPUT_DATA_PROCESSED + 'crosstabs/' + fileName + '_norm.csv'
                         crosstab = load_crosstab(filePath)
@@ -217,11 +232,9 @@ if False:
                     df_crosstab_elt = pd.DataFrame(list(crosstab_elt_vals.items()), columns=['Variable', colName_4_df])
                     df_crosstab_elt_norm = pd.DataFrame(list(crosstab_elt_vals_norm.items()), columns=['Variable', colName_4_df])
         
-                    fileName = 'crosstab_tercile_splitbyMon_' + tercileStr_modelVar + '-' + tercileStr_den + '_' + den_pltName + '_' + loc + fileStr_noOutbreaks
+                    fileName = 'crosstab_tercile_splitbyMon_' + tercileStr_modelVar + '-' + tercileStr_den + '_' + den_pltName + '_' + loc + fileStr_noOutbreaks + fileStr_survCurve
                     filePath = DIR_WHATCHEM_OUTPUT_DATA_PROCESSED + dir_crosstabs + fileName + '.csv'
                     filePath_norm = DIR_WHATCHEM_OUTPUT_DATA_PROCESSED + dir_crosstabs + fileName + '_norm.csv'
                     df_crosstab_elt.to_csv(filePath, index=False)
                     df_crosstab_elt_norm.to_csv(filePath_norm, index=False)
-
-
 

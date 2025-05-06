@@ -7,10 +7,13 @@
 # 2024-05-14, CNY: Added convert_hrly2dlyMeanMinMax()
 # 2024-05-16, CNY: Added fillMissingVals_linReg()
 # 2024-10-19, CNY: Added a whole bunch of functions while reorganizing code
+# 2025-04-14, CNY: Fixed the date parsing in read_WHATCHEM_output(), which had stopped working (perhaps due to conda env updates).
+# 2025-04-17, CNY: Updated fns to support Eisen survival curves (combine_dfs_overInitDays(), get_df_vectorPop_dly_merged())
+#                  
 #
 # Helper functions:
 #   get_tbounds_yyyymmddhh()
-#   WHATCHEM_specs_to_fpaths()
+#   WHATCHEM_specs_to_fpath()
 #   read_WHATCHEM_output()
 #   convert_hrly2dlyMeanMinMax()
 #   fillMissingVals_linReg()
@@ -142,11 +145,14 @@ def read_WHATCHEM_output(filepath_in):
                 "SHOUT (W)", "LHUP (W)", "GHW (W)", "GHC (W)", "COND (W)", \
                 "BAL_W (W)", "BAL_C (W)", "PRCP (mm)", "PRCPEFF (mm)", "EVAP (mm)", "WH (mm)", \
                 "TG (C)", "TA (C)", "TCON (C)", "TW (C)", "VPD (kPa)"]
-    df_out = pd.read_table(filepath_in, sep = "\s+", skiprows = 7, 
-                           names = colNames, na_values = "-9999.00", 
-                           parse_dates = {"Date": ["Year", "Month", "Day", "Hour"]}, # combine time cols into a single col called Date
-                           date_parser = lambda a, b, c, d: datetime.strptime(f"{a}.{b}.{c}.{d}", "%Y.%m.%d.%H"), 
-                           engine = "python")
+    #df_out = pd.read_table(filepath_in, sep = "\s+", skiprows = 7, 
+    #                       names = colNames, na_values = "-9999.00", 
+    #                       parse_dates = {"Date": ["Year", "Month", "Day", "Hour"]}, # combine time cols into a single col called Date
+    #                       date_parser = lambda a, b, c, d: datetime.strptime(f"{a}.{b}.{c}.{d}", "%Y.%m.%d.%H"), 
+    #                       engine = "python") # !!!! this code stopped working so we added the three lines below
+    df_out = pd.read_table(filepath_in, sep=r"\s+", skiprows=7, names=colNames, na_values="-9999.00", engine="python")
+    df_out["Date"] = pd.to_datetime(df_out[["Year", "Month", "Day", "Hour"]]) # combine columns into new date column
+    df_out = df_out.drop(columns=["Year", "Month", "Day", "Hour"])            # remove unneeded columns
     df_out = df_out.set_index("Date")
     df_out.attrs["metadata"] = metadata_dict
 
@@ -235,14 +241,27 @@ def strConvert_parenUnitsRemove(input_str):
 
 # Combine dfs that differ in immature introduction day into a single df.
 # The combined df has population values that are the sums of the individual dfs.
-def combine_dfs_overInitDays(dataSrc, loc, year, month, intv, initDays, initEggs, initLarvae, initPupae):
+# Arguments:
+#   years      - list of years (int)
+#   months     - list of months (int)
+#   initDays   - list of immature introduction days (int)
+#   initEggs   - number of initial eggs (int)
+#   initLarvae - number of initial larvae (int)
+#   initPupae  - number of initial pupae (int)
+#   survCurve  - "Focks" or "Eisen"; which temp-based survival curves to use
+#
+def combine_dfs_overInitDays(dataSrc, loc, year, month, intv, initDays, initEggs, initLarvae, initPupae, survCurve):
     _, subDir, fileStr_allSpecs = WHATCHEM_specs_to_fpath(dataSrc, loc, year, month, intv)
+    if survCurve == "Eisen":
+        survStr = "_eisenQuadFit"
+    else: # if survCurve is "Focks"
+        survStr = ""
     df_list = []
     pop_cols = ['pop_E', 'pop_L', 'pop_P', 'pop_A', 'pop_L(E)', 'pop_L(L)', 
                 'pop_P(E)', 'pop_P(L)', 'pop_P(P)', 'pop_A(E)', 'pop_A(L)', 'pop_A(P)']
     for initDay in initDays:
         popStr = 'day' + str(initDay) + '_' + str(initEggs) + 'e' + str(initLarvae) + 'l' + str(initPupae) + 'p'
-        fpath = DIR_WHATCHEM_OUTPUT_DATA + subDir + "df_vectorPop_dly_" + fileStr_allSpecs + '-' + popStr + ".txt"
+        fpath = DIR_WHATCHEM_OUTPUT_DATA + subDir + "df_vectorPop_dly_" + fileStr_allSpecs + '-' + popStr + survStr + ".txt"
         df_vectorPop_dly = pd.read_csv(fpath, sep='\t', na_values="NaN", index_col=0, parse_dates=True, comment='#')
         df_list.append(df_vectorPop_dly[pop_cols])                                                      # get just the population columns
     df_vectorPop_dly_pop_sumOverInitDays = sum(df_list)                                                 # sum over population columns
@@ -253,16 +272,23 @@ def combine_dfs_overInitDays(dataSrc, loc, year, month, intv, initDays, initEggs
 
 
 
-# Get dataframe that combines all df_vectorPop_dly data for one location across the specified years, months, initDays.
+# Get dataframe that combines all df_vectorPop_dly data for one location across the specified parameters.
 # Arguments:
-#   years    - list of years (int)
-#   months   - list of months (int)
-#   initDays - list of immature introduction days (int)
-def get_df_vectorPop_dly_merged(dataSrc, loc, years, months, intv, initDays, initEggs, initLarvae, initPupae):
+#   dataSrc    - "MERRA_IMERG"; source(s) of climate data
+#   loc        - "Negombo", "Jaffna", or "NuwaraEliya"; location
+#   years      - list of years (int)
+#   months     - list of months (int)
+#   initDays   - list of immature introduction days (int)
+#   initEggs   - number of initial eggs (int)
+#   initLarvae - number of initial larvae (int)
+#   initPupae  - number of initial pupae (int)
+#   survCurve  - "Focks" or "Eisen"; which temp-based survival curves to use
+#   
+def get_df_vectorPop_dly_merged(dataSrc, loc, years, months, intv, initDays, initEggs, initLarvae, initPupae, survCurve):
     df_list = []
     for year in years:
         for month in months:
-            df_allInitDays = combine_dfs_overInitDays(dataSrc, loc, year, month, intv, initDays, initEggs, initLarvae, initPupae)
+            df_allInitDays = combine_dfs_overInitDays(dataSrc, loc, year, month, intv, initDays, initEggs, initLarvae, initPupae, survCurve)
             df_list.append(df_allInitDays)
     df_vectorPop_dly_merged = pd.concat(df_list)
     df_vectorPop_dly_merged = df_vectorPop_dly_merged.sort_index() # just in case it isn't automatically sorted in datetime order
